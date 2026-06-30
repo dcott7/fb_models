@@ -13,6 +13,7 @@ from fb_models.training.evaluate import (
     evaluate_classifier,
     evaluate_knn_outcomes,
     main,
+    parse_args,
 )
 
 
@@ -137,3 +138,47 @@ def test_main_raises_when_no_data_files(tmp_path):
     (tmp_path / "data").mkdir()
     with pytest.raises(ValueError, match="No pbp_"):
         main(data_dir=tmp_path / "data")
+
+
+def test_parse_args_defaults():
+    args = parse_args([])
+    assert args.data_dir == Path("data")
+    assert args.min_season == 2016
+    assert args.test_season is None
+    assert args.k == 50
+    assert args.n_eval_samples == 2000
+    assert args.seed == 0
+
+
+def test_parse_args_overrides():
+    args = parse_args([
+        "--data-dir", "other_data",
+        "--min-season", "2018",
+        "--test-season", "2024",
+        "--k", "100",
+        "--n-eval-samples", "500",
+        "--seed", "7",
+    ])
+    assert args.data_dir == Path("other_data")
+    assert args.min_season == 2018
+    assert args.test_season == 2024
+    assert args.k == 100
+    assert args.n_eval_samples == 500
+    assert args.seed == 7
+
+
+def test_cli_invocation_with_overrides(tmp_path, capsys):
+    _write_season_parquet(tmp_path, 2019)
+    _write_season_parquet(tmp_path, 2020)
+
+    args = parse_args([
+        "--data-dir", str(tmp_path / "data"),
+        "--min-season", "2019",
+        "--test-season", "2020",
+        "--k", "5",
+        "--n-eval-samples", "10",
+    ])
+    main(**vars(args))
+
+    out = capsys.readouterr().out
+    assert "test season 2020" in out

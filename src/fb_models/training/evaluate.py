@@ -1,3 +1,4 @@
+import argparse
 from pathlib import Path
 from typing import TypedDict
 
@@ -163,5 +164,19 @@ def main(
     _print_report(test_season, classifier_metrics, outcome_comparisons)
 
 
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Evaluate the play simulation models.")
+    parser.add_argument("--data-dir", type=Path, default=Path("data"))
+    parser.add_argument("--min-season", type=int, default=2016)
+    parser.add_argument(
+        "--test-season", type=int, default=None,
+        help="Season to hold out for testing (default: most recent season found)",
+    )
+    parser.add_argument("--k", type=int, default=50)
+    parser.add_argument("--n-eval-samples", type=int, default=2000)
+    parser.add_argument("--seed", type=int, default=0)
+    return parser.parse_args(argv)
+
+
 if __name__ == "__main__":
-    main()
+    main(**vars(parse_args()))
