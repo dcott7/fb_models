@@ -13,6 +13,12 @@ def test_build_knn_index_returns_correct_types(sample_plays):
     assert len(subset) == (sample_plays["play_type"] == "run").sum()
 
 
+def test_build_knn_index_raises_on_empty_play_type(sample_plays):
+    df = sample_plays[sample_plays["play_type"] != "field_goal"].copy()
+    with pytest.raises(ValueError, match="field_goal"):
+        build_knn_index(df, "field_goal", k=5)
+
+
 def test_build_knn_index_subset_has_outcome_cols(sample_plays):
     _, _, subset = build_knn_index(sample_plays, "pass", k=5)
     required = {"play_type", "yards_gained", "complete_pass", "incomplete_pass",

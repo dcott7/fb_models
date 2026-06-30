@@ -2,7 +2,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import pytest
 import pyarrow as pa
 import pyarrow.parquet as pq
 import joblib

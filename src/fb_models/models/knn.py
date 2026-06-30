@@ -26,6 +26,9 @@ def build_knn_index(
     features = df.loc[mask, FEATURE_COLS].reset_index(drop=True)
     outcomes = df.loc[mask, OUTCOME_COLS].reset_index(drop=True)
 
+    if len(outcomes) == 0:
+        raise ValueError(f"No '{play_type}' plays found in the provided data")
+
     X = features.to_numpy(dtype=np.float64)
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)

@@ -107,3 +107,27 @@ def test_load_plays_output_columns(tmp_path):
         "fumble_lost",
     }
     assert set(df.columns) == expected
+
+
+def test_load_plays_filters_null_down(tmp_path):
+    row1 = {**_base_row(), "order_sequence": 1, "down": np.nan}
+    row2 = {**_base_row(), "order_sequence": 2, "down": 1}
+    path = tmp_path / "pbp_2020.parquet"
+    _write_parquet(path, pd.DataFrame([row1, row2]))
+    df = load_plays(tmp_path, min_season=2020)
+    assert len(df) == 1
+    assert df["down"].iloc[0] == 1
+
+
+def test_load_plays_empty_directory_returns_empty_dataframe(tmp_path):
+    df = load_plays(tmp_path, min_season=2020)
+    assert isinstance(df, pd.DataFrame)
+    assert len(df) == 0
+    expected = {
+        "play_type", "down", "ydstogo", "yardline_100", "score_differential",
+        "qtr", "game_seconds_remaining", "posteam_timeouts_remaining",
+        "defteam_timeouts_remaining", "goal_to_go", "yards_gained",
+        "complete_pass", "incomplete_pass", "interception", "fumble",
+        "fumble_lost",
+    }
+    assert set(df.columns) == expected
