@@ -95,18 +95,18 @@ nflverse parquet files: `data/pbp_{season}.parquet`, seasons 1999–2025.
 - `down` is not null — eliminates kickoffs, administrative rows, and between-play records
 - `season >= MIN_SEASON` (default: **2016**) — focuses on the modern NFL era; parameterized for easy adjustment
 
-### Derived Column: `play_duration`
+### `seconds_elapsed`: Random Draw by Play Type
 
-`seconds_elapsed` is not stored directly. It is computed as:
+nflverse does not carry a usable snap-to-whistle duration signal — `play_clock` is uniformly `"0"` in real data, so it cannot be used to derive play duration. Instead, `seconds_elapsed` is generated at K-NN query time as a uniform random draw, with the range conditioned on `play_type`:
 
-```
-play_duration = (game_seconds_remaining[i] - game_seconds_remaining[i+1])
-                - (40 - play_clock[i+1])
-```
+| `play_type`   | Range (seconds) |
+|---------------|------------------|
+| `run`         | 4.0 – 7.0        |
+| `pass`        | 5.0 – 8.0        |
+| `punt`        | 3.0 – 5.0        |
+| `field_goal`  | 2.0 – 4.0        |
 
-The second term approximates inter-play administration time (huddle + play clock drain before the next snap). The play clock is assumed to start at 40 seconds; the result is clamped to a reasonable range per play type to handle end-of-quarter and missing `play_clock` values.
-
-This column is precomputed once during data loading and carried through to the K-NN index.
+This draw uses the same `rng` passed into `query_knn`, so results stay deterministic given a fixed seed. It is not a historical column and is not stored in the loaded play data or the K-NN outcome index — `play_clock` is dropped from the data pipeline entirely.
 
 ### Output
 
