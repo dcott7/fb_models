@@ -37,7 +37,7 @@ Each sampled play produces the following fields, extracted directly from the mat
 | `is_intercepted` | `interception` |
 | `is_fumble` | `fumble` |
 | `is_turnover` | `interception == 1 OR fumble_lost == 1` |
-| `seconds_elapsed` | precomputed `play_duration` (see Data Pipeline) |
+| `seconds_elapsed` | uniform random draw, ranged by `play_type` (see "seconds_elapsed: Random Draw by Play Type" below) |
 
 Additional output fields can be added later by pulling additional columns from the parquet data during preprocessing — no model retraining required.
 
@@ -143,8 +143,7 @@ A single cleaned DataFrame with all feature columns and all outcome columns requ
 **Extensibility:** Adding a new output field requires only pulling an additional column from parquet during preprocessing and extracting it from the sampled row. No index rebuilding, no classifier retraining.
 
 **Artifacts:**
-- `artifacts/knn_{play_type}.joblib` — K-NN index
-- `artifacts/scaler_{play_type}.joblib` — fitted StandardScaler
+- `artifacts/knn_{play_type}.joblib` — a single serialized `(NearestNeighbors, StandardScaler, outcomes_df)` tuple per play type. The fitted scaler is bundled with its index rather than written separately, so the two can never desync.
 
 ---
 
@@ -154,7 +153,7 @@ A single cleaned DataFrame with all feature columns and all outcome columns requ
 fb_models/
   src/fb_models/
     data/
-      loader.py       # load & filter parquets, compute play_duration
+      loader.py       # load & filter parquets, remap play types
       features.py     # feature constants, feature vector construction
     models/
       classifier.py   # LightGBM train/serialize
@@ -182,5 +181,5 @@ fb_models/
 | Outcome model | K-NN sampling | Preserves realistic joint distributions across all output fields |
 | Kickoffs | Out of scope | Handled by simulation engine |
 | Extra points / 2-pt | Out of scope | Excluded by user decision |
-| `seconds_elapsed` | Play duration (snap to whistle) | Computed via play_clock adjustment; inter-play time excluded |
+| `seconds_elapsed` | Uniform random draw, ranged by `play_type` | `play_clock` is uniformly `"0"` in real nflverse data and unusable for a derived duration; a query-time draw using the existing `rng` keeps results deterministic per seed |
 | Simulation layer | Out of scope | Lives in a separate project; this project ships artifacts only |
