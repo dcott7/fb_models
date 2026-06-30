@@ -1,4 +1,4 @@
-from typing import TypeAlias
+from typing import TypeAlias, TypedDict
 
 import numpy as np
 import pandas as pd
@@ -7,8 +7,13 @@ from sklearn.preprocessing import StandardScaler
 
 from fb_models.data.features import FEATURE_COLS, OUTCOME_COLS
 
-KNNIndex: TypeAlias = tuple[NearestNeighbors, StandardScaler, pd.DataFrame]
+class KNNIndex(TypedDict):
+    nn: NearestNeighbors
+    scaler: StandardScaler
+    outcomes: pd.DataFrame
 
+
+# lower and upper bounds for how long a play of this play type takes to execute
 SECONDS_ELAPSED_RANGES: dict[str, tuple[float, float]] = {
     "run": (4.0, 7.0),
     "pass": (5.0, 8.0),
@@ -31,12 +36,16 @@ def build_knn_index(
 
     X = features.to_numpy(dtype=np.float64)
     scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
+    X_scaled = scaler.fit_transform(X) # type: ignore
 
     nn = NearestNeighbors(n_neighbors=min(k, len(outcomes)), metric="euclidean", algorithm="ball_tree")
     nn.fit(X_scaled)
 
-    return nn, scaler, outcomes
+    return {
+        "nn": nn,
+        "scaler": scaler,
+        "outcomes": outcomes,
+    }
 
 
 def query_knn(
@@ -44,11 +53,14 @@ def query_knn(
     game_state: np.ndarray,
     rng: np.random.Generator,
 ) -> dict[str, object]:
-    nn, scaler, outcomes = knn_index
+    nn = knn_index["nn"]
+    scaler = knn_index["scaler"]
+    outcomes = knn_index["outcomes"]
+    
     x_scaled = scaler.transform(game_state.reshape(1, -1))
     _, indices = nn.kneighbors(x_scaled)
-    idx = rng.choice(indices[0])
-    row = outcomes.iloc[idx]
+    idx = rng.choice(indices[0]) # type: ignore
+    row = outcomes.iloc[idx] # type: ignore
 
     low, high = SECONDS_ELAPSED_RANGES[str(row["play_type"])]
     seconds_elapsed = float(rng.uniform(low, high))

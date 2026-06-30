@@ -7,10 +7,10 @@ from fb_models.models.knn import SECONDS_ELAPSED_RANGES, build_knn_index, query_
 
 
 def test_build_knn_index_returns_correct_types(sample_plays):
-    nn, scaler, subset = build_knn_index(sample_plays, "run", k=5)
-    assert isinstance(nn, NearestNeighbors)
-    assert isinstance(scaler, StandardScaler)
-    assert len(subset) == (sample_plays["play_type"] == "run").sum()
+    knn_index = build_knn_index(sample_plays, "run", k=5)
+    assert isinstance(knn_index["nn"], NearestNeighbors)
+    assert isinstance(knn_index["scaler"], StandardScaler)
+    assert len(knn_index["outcomes"]) == (sample_plays["play_type"] == "run").sum()
 
 
 def test_build_knn_index_raises_on_empty_play_type(sample_plays):
@@ -20,10 +20,10 @@ def test_build_knn_index_raises_on_empty_play_type(sample_plays):
 
 
 def test_build_knn_index_subset_has_outcome_cols(sample_plays):
-    _, _, subset = build_knn_index(sample_plays, "pass", k=5)
+    knn_index = build_knn_index(sample_plays, "pass", k=5)
     required = {"play_type", "yards_gained", "complete_pass", "incomplete_pass",
                 "interception", "fumble", "fumble_lost"}
-    assert required.issubset(set(subset.columns))
+    assert required.issubset(set(knn_index["outcomes"].columns))
 
 
 def test_query_knn_returns_all_output_fields(sample_plays):

@@ -78,7 +78,7 @@ def test_main_artifacts_are_loadable(tmp_path):
     assert isinstance(clf, lgb.LGBMClassifier)
 
     for pt in PLAY_TYPES:
-        nn, scaler, outcomes = joblib.load(artifacts_dir / f"knn_{pt}.joblib")
-        assert isinstance(nn, NearestNeighbors)
-        assert isinstance(scaler, StandardScaler)
-        assert isinstance(outcomes, pd.DataFrame)
+        knn_index = joblib.load(artifacts_dir / f"knn_{pt}.joblib")
+        assert isinstance(knn_index["nn"], NearestNeighbors)
+        assert isinstance(knn_index["scaler"], StandardScaler)
+        assert isinstance(knn_index["outcomes"], pd.DataFrame)

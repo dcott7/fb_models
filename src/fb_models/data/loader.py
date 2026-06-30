@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pandas as pd
 
-_NEEDED_COLS = [
+_NEEDED_COLS: list[str] = [
     "game_id", "order_sequence", "season_type", "play_type", "qtr",
     "down", "ydstogo", "yardline_100", "score_differential",
     "game_seconds_remaining",
@@ -11,10 +11,10 @@ _NEEDED_COLS = [
     "interception", "fumble", "fumble_lost",
 ]
 
-_VALID_PLAY_TYPES = {"run", "pass", "punt", "field_goal"}
-_PLAY_TYPE_REMAP = {"qb_kneel": "run", "qb_spike": "pass"}
+_VALID_PLAY_TYPES: set[str] = {"run", "pass", "punt", "field_goal"}
+_PLAY_TYPE_REMAP: dict[str, str] = {"qb_kneel": "run", "qb_spike": "pass"}
 
-_OUTPUT_COLS = [
+_OUTPUT_COLS: list[str] = [
     "play_type", "down", "ydstogo", "yardline_100", "score_differential",
     "qtr", "game_seconds_remaining", "posteam_timeouts_remaining",
     "defteam_timeouts_remaining", "goal_to_go", "yards_gained",
@@ -23,11 +23,15 @@ _OUTPUT_COLS = [
 ]
 
 
-def load_plays(data_dir: Path, min_season: int = 2016) -> pd.DataFrame:
-    frames = []
+def load_plays(
+    data_dir: Path, min_season: int = 2016, max_season: int | None = None
+) -> pd.DataFrame:
+    frames: list[pd.DataFrame] = []
     for path in sorted(data_dir.glob("pbp_*.parquet")):
         season = int(path.stem.split("_")[1])
         if season < min_season:
+            continue
+        if max_season is not None and season > max_season:
             continue
         frames.append(pd.read_parquet(path, columns=_NEEDED_COLS))
 
@@ -35,7 +39,8 @@ def load_plays(data_dir: Path, min_season: int = 2016) -> pd.DataFrame:
         return pd.DataFrame(columns=_OUTPUT_COLS)
 
     df = pd.concat(frames, ignore_index=True)
-    df = df[df["season_type"].isin({"REG", "POST"})]
+    # only want REG/POST season as teams don't care about preseason
+    df = df[df["season_type"].isin(["REG", "POST"])]
     df = df[df["down"].notna()]
 
     spike_mask = df["play_type"] == "qb_spike"
@@ -43,7 +48,7 @@ def load_plays(data_dir: Path, min_season: int = 2016) -> pd.DataFrame:
     df.loc[spike_mask, "incomplete_pass"] = 1
 
     df["play_type"] = df["play_type"].replace(_PLAY_TYPE_REMAP)
-    df = df[df["play_type"].isin(_VALID_PLAY_TYPES)]
+    df = df[df["play_type"].isin(list(_VALID_PLAY_TYPES))]
 
     df = df.sort_values(["game_id", "order_sequence"])
 

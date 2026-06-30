@@ -119,6 +119,17 @@ def test_load_plays_filters_null_down(tmp_path):
     assert df["down"].iloc[0] == 1
 
 
+def test_load_plays_filters_by_max_season(tmp_path):
+    _make_consecutive_plays(tmp_path, 2018)
+    _make_consecutive_plays(tmp_path, 2020)
+    _make_consecutive_plays(tmp_path, 2022)
+
+    df = load_plays(tmp_path, min_season=2016, max_season=2020)
+
+    # 2018 and 2020 each contribute 2 rows; 2022 must be excluded.
+    assert len(df) == 4
+
+
 def test_load_plays_empty_directory_returns_empty_dataframe(tmp_path):
     df = load_plays(tmp_path, min_season=2020)
     assert isinstance(df, pd.DataFrame)

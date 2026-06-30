@@ -19,7 +19,7 @@ def train_classifier(df: pd.DataFrame) -> lgb.LGBMClassifier:
         random_state=42,
         verbosity=-1,
     )
-    clf.fit(X, y)
+    clf.fit(X, y) # type: ignore
     return clf
 
 
@@ -27,5 +27,7 @@ def predict_play_type_probs(
     clf: lgb.LGBMClassifier,
     game_state: np.ndarray,
 ) -> dict[str, float]:
-    probs = clf.predict_proba(game_state.reshape(1, -1))[0]
+    probs = np.asarray(
+        clf.predict_proba(game_state.reshape(1, -1)) # type: ignore
+    )[0]
     return dict(zip(clf.classes_, probs))

@@ -13,6 +13,7 @@ dependencies = [
     "pyarrow>=14.0",
     "requests>=2.32.5",
     "types-requests>=2.32.4.20260107",
+    "joblib-stubs>=1.5.3.1.20260117",
 ]
 
 [dependency-groups]
