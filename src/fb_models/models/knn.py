@@ -5,9 +5,16 @@ import pandas as pd
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import StandardScaler
 
-from fb_models.data.features import FEATURE_COLS, OUTCOME_COLS, build_feature_matrix
+from fb_models.data.features import FEATURE_COLS, OUTCOME_COLS
 
 KNNIndex: TypeAlias = tuple[NearestNeighbors, StandardScaler, pd.DataFrame]
+
+SECONDS_ELAPSED_RANGES: dict[str, tuple[float, float]] = {
+    "run": (4.0, 7.0),
+    "pass": (5.0, 8.0),
+    "punt": (3.0, 5.0),
+    "field_goal": (2.0, 4.0),
+}
 
 
 def build_knn_index(
@@ -40,6 +47,9 @@ def query_knn(
     idx = rng.choice(indices[0])
     row = outcomes.iloc[idx]
 
+    low, high = SECONDS_ELAPSED_RANGES[str(row["play_type"])]
+    seconds_elapsed = float(rng.uniform(low, high))
+
     return {
         "play_type": str(row["play_type"]),
         "yards_gained": int(row["yards_gained"]),
@@ -48,5 +58,5 @@ def query_knn(
         "is_intercepted": bool(row["interception"]),
         "is_fumble": bool(row["fumble"]),
         "is_turnover": bool(row["interception"] or row["fumble_lost"]),
-        "seconds_elapsed": float(row["play_duration"]),
+        "seconds_elapsed": seconds_elapsed,
     }

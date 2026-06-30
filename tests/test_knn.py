@@ -3,7 +3,7 @@ import pytest
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import StandardScaler
 
-from fb_models.models.knn import build_knn_index, query_knn
+from fb_models.models.knn import SECONDS_ELAPSED_RANGES, build_knn_index, query_knn
 
 
 def test_build_knn_index_returns_correct_types(sample_plays):
@@ -16,7 +16,7 @@ def test_build_knn_index_returns_correct_types(sample_plays):
 def test_build_knn_index_subset_has_outcome_cols(sample_plays):
     _, _, subset = build_knn_index(sample_plays, "pass", k=5)
     required = {"play_type", "yards_gained", "complete_pass", "incomplete_pass",
-                "interception", "fumble", "fumble_lost", "play_duration"}
+                "interception", "fumble", "fumble_lost"}
     assert required.issubset(set(subset.columns))
 
 
@@ -51,6 +51,16 @@ def test_query_knn_is_turnover_is_true_when_interception(sample_plays):
     rng = np.random.default_rng(2)
     result = query_knn(knn_index, game_state, rng)
     assert result["is_turnover"] is True
+
+
+def test_query_knn_seconds_elapsed_within_play_type_range(sample_plays):
+    knn_index = build_knn_index(sample_plays, "punt", k=5)
+    game_state = np.array([4, 10, 60, 0, 2, 1800, 3, 3, 0], dtype=np.float64)
+    rng = np.random.default_rng(3)
+    result = query_knn(knn_index, game_state, rng)
+    low, high = SECONDS_ELAPSED_RANGES["punt"]
+    assert isinstance(result["seconds_elapsed"], float)
+    assert low <= result["seconds_elapsed"] <= high
 
 
 def test_query_knn_deterministic_with_same_seed(sample_plays):

@@ -27,5 +27,4 @@ def sample_plays() -> pd.DataFrame:
         "interception": rng.integers(0, 2, n),
         "fumble": rng.integers(0, 2, n),
         "fumble_lost": rng.integers(0, 2, n),
-        "play_duration": rng.uniform(1.0, 15.0, n),
     })

@@ -29,7 +29,7 @@ def test_play_types_sorted():
 def test_outcome_cols_contains_required():
     required = {
         "play_type", "yards_gained", "complete_pass", "incomplete_pass",
-        "interception", "fumble", "fumble_lost", "play_duration",
+        "interception", "fumble", "fumble_lost",
     }
     assert required.issubset(set(OUTCOME_COLS))
 

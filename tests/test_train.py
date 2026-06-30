@@ -17,9 +17,8 @@ from fb_models.data.features import PLAY_TYPES
 def _write_minimal_parquet(tmp_path: Path) -> None:
     """Write a parquet with 15 games per play type (60 games total, 120 rows).
 
-    Each game has exactly two plays of the same type in the same quarter so
-    play_duration can be computed for the first play. After loader processing,
-    60 plays survive — 15 per play type.
+    Each game has exactly two plays of the same type in the same quarter.
+    After loader processing, all 120 plays survive — 30 per play type.
     """
     rng = np.random.default_rng(0)
     play_type_cycle = ["run", "pass", "punt", "field_goal"] * 15  # 60 games
@@ -38,7 +37,6 @@ def _write_minimal_parquet(tmp_path: Path) -> None:
                 "score_differential": int(rng.integers(-28, 29)),
                 "qtr": 1,
                 "game_seconds_remaining": 3600 if seq == 1 else 3560,
-                "play_clock": int(rng.integers(10, 36)),
                 "posteam_timeouts_remaining": 3,
                 "defteam_timeouts_remaining": 3,
                 "goal_to_go": 0,

@@ -23,7 +23,6 @@ OUTCOME_COLS: list[str] = [
     "interception",
     "fumble",
     "fumble_lost",
-    "play_duration",
 ]
 
 
