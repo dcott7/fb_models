@@ -13,4 +13,13 @@ wheels/
 data/*.parquet
 
 # Trained model artifacts
-artifacts/
+# artifacts/
+
+.claude/
+.mypy_cache/
+.pytest_cache/
+.superpowers/
+
+.DS_Store
+
+docs/
