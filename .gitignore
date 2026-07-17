@@ -10,16 +10,19 @@ wheels/
 .venv
 
 # Local data artifacts
-data/*.parquet
+data/**/*.parquet
+data/**/*.csv
+data/**/*.json
 
 # Trained model artifacts
-# artifacts/
+# models/
 
 .claude/
 .mypy_cache/
 .pytest_cache/
-.superpowers/
+docs/superpowers/
 
 .DS_Store
 
-docs/
+# mkdocs build output
+site/

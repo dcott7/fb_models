@@ -1,0 +1,13 @@
+site_name: fb_models
+site_description: NFL play simulation models
+docs_dir: docs
+
+nav:
+  - Home: index.md
+  - Design Spec: superpowers/specs/2026-06-25-play-simulation-models-design.md
+  - Implementation Plan: superpowers/plans/2026-06-25-play-simulation-models.md
+
+theme:
+  name: material
+  palette:
+    scheme: slate

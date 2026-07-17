@@ -14,10 +14,19 @@ dependencies = [
     "requests>=2.32.5",
     "types-requests>=2.32.4.20260107",
     "joblib-stubs>=1.5.3.1.20260117",
+    "ipykernel>=7.3.0",
+    "seaborn>=0.13.2",
+    "pandas-stubs>=3.0.3.260530",
+    "black[jupyter]>=26.5.1",
 ]
 
 [dependency-groups]
-dev = ["pytest>=8.0"]
+dev = [
+    "pytest>=8.0",
+    "flake8>=7.0",
+    "mkdocs>=1.6",
+    "mkdocs-material>=9.5",
+]
 
 [build-system]
 requires = ["hatchling"]
