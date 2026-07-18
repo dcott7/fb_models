@@ -181,16 +181,29 @@ def _add_coach_tendency_features(
     return df
 
 
-def build_coach_snapshot(pbp_df: pd.DataFrame, participation_df: pd.DataFrame) -> dict:
-    """Current (all-history) coach-tendency snapshot, for simulation-time lookup.
+def build_coach_snapshot(
+    pbp_df: pd.DataFrame,
+    participation_df: pd.DataFrame,
+    as_of_season: int | None = None,
+    as_of_week: int | None = None,
+) -> dict:
+    """Coach-tendency snapshot, for simulation-time lookup.
 
     Unlike _add_coach_tendency_features, which computes a leakage-safe
     expanding value per historical play (excluding that play's own outcome,
-    since training rows can't see the future), this aggregates each coach's
-    *entire* available history with no exclusion -- there's no leakage
+    since training rows can't see the future), this aggregates a coach's
+    available history with no per-play exclusion -- there's no leakage
     concern for a static lookup table queried at inference time. Uses the
     same _COACH_TENDENCY_SPECS as training, so a coach's snapshot numbers
     can't drift from what the model was actually trained on.
+
+    When simulating a *historical* game, pass as_of_season/as_of_week (the
+    season/week of the game being simulated) so the snapshot only reflects
+    plays strictly before it -- otherwise a coach's tendency would be
+    computed using data from after the simulated game, which is exactly
+    the leakage problem the expanding-rate logic exists to prevent during
+    training. Omit both only when simulating a hypothetical game beyond
+    all available data (nothing to exclude in that case).
 
     Returns a dict keyed by coach name, e.g.
     {"Andy Reid": {"off_pass_rate_hist": 0.61, ...}}. A coach only appears
@@ -198,6 +211,13 @@ def build_coach_snapshot(pbp_df: pd.DataFrame, participation_df: pd.DataFrame) -
     for defense.
     """
     df = _filter_and_label(pbp_df)
+
+    if as_of_season is not None:
+        before_cutoff = (df["season"] < as_of_season) | (
+            (df["season"] == as_of_season) & (df["week"] < as_of_week)
+        )
+        df = df[before_cutoff]
+
     df = _merge_participation(df, participation_df)
 
     snapshot: dict = {}
