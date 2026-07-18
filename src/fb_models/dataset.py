@@ -95,6 +95,7 @@ _GAMES_RETAIN_COL: list[str] = [
     "season",
     "game_type",
     "week",
+    "gameday",
     "away_team",
     "home_team",
     "location",
