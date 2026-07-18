@@ -1,3 +1,5 @@
+from typing import Callable
+
 import pandas as pd
 
 _VALID_PLAY_TYPES = {"run", "pass", "punt", "field_goal"}
@@ -71,69 +73,147 @@ def _expanding_rate(
     return cum_hits / cum_eligible
 
 
-def _add_coach_tendency_features(
+def _merge_participation(
     df: pd.DataFrame, participation_df: pd.DataFrame
 ) -> pd.DataFrame:
     part = participation_df[_PARTICIPATION_COLS]
 
-    df = df.merge(
+    return df.merge(
         part,
         left_on=["game_id", "play_id"],
         right_on=["nflverse_game_id", "play_id"],
         how="left",
     )
+
+
+# (feature name, group column, hit-mask fn, eligible-mask fn). Shared between
+# _add_coach_tendency_features (leakage-safe expanding, for training) and
+# build_coach_snapshot (plain all-history aggregate, for simulation-time
+# lookup) so the two can never define "this coach's pass rate" differently.
+_MaskFn = Callable[[pd.DataFrame], pd.Series]
+_CoachTendencySpec = tuple[str, str, _MaskFn, _MaskFn]
+
+_COACH_TENDENCY_SPECS: list[_CoachTendencySpec] = [
+    (
+        "off_pass_rate_hist",
+        "offense_coach",
+        lambda df: df["is_pass"],
+        lambda df: df["is_go_for_it"],
+    ),
+    (
+        "off_early_down_pass_rate_hist",
+        "offense_coach",
+        lambda df: df["is_pass"],
+        lambda df: df["is_go_for_it"] & df["early_down"],
+    ),
+    (
+        "off_red_zone_pass_rate_hist",
+        "offense_coach",
+        lambda df: df["is_pass"],
+        lambda df: df["is_go_for_it"] & df["red_zone"],
+    ),
+    (
+        "off_goal_line_pass_rate_hist",
+        "offense_coach",
+        lambda df: df["is_pass"],
+        lambda df: df["is_go_for_it"] & df["goal_line"],
+    ),
+    (
+        "off_neutral_pass_rate_hist",
+        "offense_coach",
+        lambda df: df["is_pass"],
+        lambda df: df["is_go_for_it"] & df["neutral_script"],
+    ),
+    (
+        "off_fourth_down_go_for_it_rate_hist",
+        "offense_coach",
+        lambda df: df["is_go_for_it"],
+        lambda df: df["down"] == 4,
+    ),
+    (
+        "off_shotgun_rate_hist",
+        "offense_coach",
+        lambda df: df["shotgun"] == 1,
+        lambda df: df["is_go_for_it"],
+    ),
+    (
+        "off_no_huddle_rate_hist",
+        "offense_coach",
+        lambda df: df["no_huddle"] == 1,
+        lambda df: df["is_go_for_it"],
+    ),
+    (
+        "def_pass_rate_allowed_hist",
+        "defense_coach",
+        lambda df: df["is_pass"],
+        lambda df: df["is_go_for_it"],
+    ),
+    (
+        "def_blitz_rate_hist",
+        "defense_coach",
+        lambda df: df["number_of_pass_rushers"] >= _BLITZ_PASS_RUSHERS,
+        lambda df: df["number_of_pass_rushers"].notna(),
+    ),
+    (
+        "def_pressure_rate_hist",
+        "defense_coach",
+        lambda df: df["was_pressure"] == True,  # noqa: E712
+        lambda df: df["was_pressure"].notna(),
+    ),
+    (
+        "def_man_rate_hist",
+        "defense_coach",
+        lambda df: df["defense_man_zone_type"] == "MAN_COVERAGE",
+        lambda df: df["defense_man_zone_type"].notna(),
+    ),
+]
+
+
+def _add_coach_tendency_features(
+    df: pd.DataFrame, participation_df: pd.DataFrame
+) -> pd.DataFrame:
+    df = _merge_participation(df, participation_df)
     df = df.sort_values(_SORT_COLS)
 
-    # offense history
-    df["off_pass_rate_hist"] = _expanding_rate(
-        df, "offense_coach", df["is_pass"], df["is_go_for_it"]
-    )
-    df["off_early_down_pass_rate_hist"] = _expanding_rate(
-        df, "offense_coach", df["is_pass"], df["is_go_for_it"] & df["early_down"]
-    )
-    df["off_red_zone_pass_rate_hist"] = _expanding_rate(
-        df, "offense_coach", df["is_pass"], df["is_go_for_it"] & df["red_zone"]
-    )
-    df["off_goal_line_pass_rate_hist"] = _expanding_rate(
-        df, "offense_coach", df["is_pass"], df["is_go_for_it"] & df["goal_line"]
-    )
-    df["off_neutral_pass_rate_hist"] = _expanding_rate(
-        df, "offense_coach", df["is_pass"], df["is_go_for_it"] & df["neutral_script"]
-    )
-    df["off_fourth_down_go_for_it_rate_hist"] = _expanding_rate(
-        df, "offense_coach", df["is_go_for_it"], df["down"] == 4
-    )
-    df["off_shotgun_rate_hist"] = _expanding_rate(
-        df, "offense_coach", df["shotgun"] == 1, df["is_go_for_it"]
-    )
-    df["off_no_huddle_rate_hist"] = _expanding_rate(
-        df, "offense_coach", df["no_huddle"] == 1, df["is_go_for_it"]
-    )
-
-    # defense history
-    df["def_pass_rate_allowed_hist"] = _expanding_rate(
-        df, "defense_coach", df["is_pass"], df["is_go_for_it"]
-    )
-    df["def_blitz_rate_hist"] = _expanding_rate(
-        df,
-        "defense_coach",
-        df["number_of_pass_rushers"] >= _BLITZ_PASS_RUSHERS,
-        df["number_of_pass_rushers"].notna(),
-    )
-    df["def_pressure_rate_hist"] = _expanding_rate(
-        df,
-        "defense_coach",
-        df["was_pressure"] == True,
-        df["was_pressure"].notna(),  # noqa: E712
-    )
-    df["def_man_rate_hist"] = _expanding_rate(
-        df,
-        "defense_coach",
-        df["defense_man_zone_type"] == "MAN_COVERAGE",
-        df["defense_man_zone_type"].notna(),
-    )
+    for name, group_col, hit_fn, eligible_fn in _COACH_TENDENCY_SPECS:
+        df[name] = _expanding_rate(df, group_col, hit_fn(df), eligible_fn(df))
 
     return df
+
+
+def build_coach_snapshot(pbp_df: pd.DataFrame, participation_df: pd.DataFrame) -> dict:
+    """Current (all-history) coach-tendency snapshot, for simulation-time lookup.
+
+    Unlike _add_coach_tendency_features, which computes a leakage-safe
+    expanding value per historical play (excluding that play's own outcome,
+    since training rows can't see the future), this aggregates each coach's
+    *entire* available history with no exclusion -- there's no leakage
+    concern for a static lookup table queried at inference time. Uses the
+    same _COACH_TENDENCY_SPECS as training, so a coach's snapshot numbers
+    can't drift from what the model was actually trained on.
+
+    Returns a dict keyed by coach name, e.g.
+    {"Andy Reid": {"off_pass_rate_hist": 0.61, ...}}. A coach only appears
+    under the offense keys if they've called offensive plays, and similarly
+    for defense.
+    """
+    df = _filter_and_label(pbp_df)
+    df = _merge_participation(df, participation_df)
+
+    snapshot: dict = {}
+
+    for name, group_col, hit_fn, eligible_fn in _COACH_TENDENCY_SPECS:
+        hit = hit_fn(df).astype(float)
+        eligible = eligible_fn(df).astype(float)
+
+        rate = (hit * eligible).groupby(df[group_col]).sum() / eligible.groupby(
+            df[group_col]
+        ).sum()
+
+        for coach, value in rate.items():
+            snapshot.setdefault(coach, {})[name] = value
+
+    return snapshot
 
 
 def _add_game_context_features(
