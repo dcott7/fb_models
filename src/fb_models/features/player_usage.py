@@ -31,7 +31,10 @@ _VALID_PLAY_TYPES = {"run", "pass"}
 
 
 def _prepare_plays(
-    pbp_df: pd.DataFrame, participation_df: pd.DataFrame
+    pbp_df: pd.DataFrame,
+    participation_df: pd.DataFrame,
+    extra_pbp_cols: list[str] | None = None,
+    extra_participation_cols: list[str] | None = None,
 ) -> pd.DataFrame:
     # offense_personnel is also tracked for punt/field_goal/special-teams
     # plays (confirmed on real data: e.g. "1 C, 1 DE, 3 G, 1 K, 1 LS, 1 P,
@@ -45,12 +48,20 @@ def _prepare_plays(
         & (pbp_df["play_type"].isin(_VALID_PLAY_TYPES))
     ]
 
-    part = participation_df[
-        ["nflverse_game_id", "play_id", "offense_personnel", "offense_players"]
-    ].copy()
+    pbp_cols = ["game_id", "play_id", "season", "week", "posteam"] + (
+        extra_pbp_cols or []
+    )
+    part_cols = [
+        "nflverse_game_id",
+        "play_id",
+        "offense_personnel",
+        "offense_players",
+    ] + (extra_participation_cols or [])
+
+    part = participation_df[part_cols].copy()
     part = derive_personnel_package(part)
 
-    df = pbp[["game_id", "play_id", "season", "week", "posteam"]].merge(
+    df = pbp[pbp_cols].merge(
         part,
         left_on=["game_id", "play_id"],
         right_on=["nflverse_game_id", "play_id"],
@@ -60,20 +71,25 @@ def _prepare_plays(
     return df
 
 
-def _player_group_and_rank(depth_chart_df: pd.DataFrame) -> pd.DataFrame:
+def _player_group_and_rank(
+    depth_chart_df: pd.DataFrame, groups: set[str] = _SKILL_GROUPS
+) -> pd.DataFrame:
     """(team, season, gsis_id) -> the player's most common position_group and
-    depth-chart rank across weeks that season, restricted to the skill
-    groups (RB/TE/WR) that need usage-share sampling -- QB/OL are resolved
-    deterministically by rank elsewhere and don't need a share lookup.
+    depth-chart rank across weeks that season, restricted to `groups`
+    (default: the skill groups RB/TE/WR that need usage-share sampling in
+    player_selection -- QB/OL are resolved deterministically by rank there
+    and don't need a share lookup). Callers needing a rank prior for QB too
+    (e.g. rush-touch shares, where the QB is a normal scramble/designed-run
+    candidate) can pass `groups=_SKILL_GROUPS | {"QB"}`.
     """
     offense_depth = build_offense_depth_chart(depth_chart_df)
 
     rows = []
     for team, seasons in offense_depth.items():
         for season, weeks in seasons.items():
-            for _week, groups in weeks.items():
-                for group, ranked in groups.items():
-                    if group not in _SKILL_GROUPS:
+            for _week, position_groups in weeks.items():
+                for group, ranked in position_groups.items():
+                    if group not in groups:
                         continue
                     for rank, gsis_id in ranked.items():
                         rows.append((team, season, gsis_id, group, rank))
