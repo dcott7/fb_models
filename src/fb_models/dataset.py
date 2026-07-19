@@ -126,6 +126,7 @@ _DEPTH_CHARTS_RETAIN_COLS: list[str] = [
     "week",
     "game_type",
     "formation",
+    "position",
     "depth_position",
     "depth_team",
     "gsis_id",
