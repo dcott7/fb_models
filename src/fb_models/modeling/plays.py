@@ -2,6 +2,8 @@ from typing import Callable
 
 import pandas as pd
 
+from ..personnel_packages import derive_personnel_package
+
 _VALID_PLAY_TYPES = {"run", "pass", "punt", "field_goal"}
 _PLAY_TYPE_REMAP = {"qb_kneel": "run", "qb_spike": "pass"}
 
@@ -42,33 +44,6 @@ _FORMATION_REMAP = {
     "WILDCAT": "UNDER CENTER",
     "EMPTY": "SHOTGUN",
 }
-
-# offense_personnel has the same season-boundary problem as offense_formation,
-# but worse: 2016-2022 use skill-position shorthand ("1 RB, 1 TE, 3 WR", ~100
-# unique strings/season), while 2023+ spells out the full 11-man lineup
-# including O-line ("1 C, 2 G, 1 QB, 1 RB, 2 T, 1 TE, 3 WR", ~1,458 unique
-# strings in 2024 alone). Parsing out just the RB/TE counts (present in both
-# formats) and deriving the standard football-shorthand package code ("11",
-# "12", "21", ...) gives a season-stable label space -- verified on real
-# 2016-2025 data: the top 8 packages below cover 98% of all plays every
-# season. Anything else buckets to OTHER.
-_PERSONNEL_KEEP_PACKAGES = {"11", "12", "21", "13", "22", "01", "10", "02"}
-
-
-def _derive_personnel_package(df: pd.DataFrame) -> pd.DataFrame:
-    has_personnel = df["offense_personnel"].notna()
-
-    rb = df["offense_personnel"].str.extract(r"(\d+)\s*RB")[0].fillna("0")
-    te = df["offense_personnel"].str.extract(r"(\d+)\s*TE")[0].fillna("0")
-    package = rb + te
-
-    df["offense_personnel_package"] = package.where(
-        package.isin(_PERSONNEL_KEEP_PACKAGES), "OTHER"
-    )
-    df.loc[~has_personnel, "offense_personnel_package"] = None
-
-    return df
-
 
 _GAMES_COLS = [
     "game_id",
@@ -125,7 +100,7 @@ def _merge_participation(
 ) -> pd.DataFrame:
     part = participation_df[_PARTICIPATION_COLS].copy()
     part["offense_formation"] = part["offense_formation"].replace(_FORMATION_REMAP)
-    part = _derive_personnel_package(part)
+    part = derive_personnel_package(part)
 
     return df.merge(
         part,
