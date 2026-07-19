@@ -21,6 +21,7 @@ _PARTICIPATION_COLS = [
     "defense_man_zone_type",
     "was_pressure",
     "number_of_pass_rushers",
+    "offense_formation",
 ]
 
 _GAMES_COLS = [
@@ -135,6 +136,18 @@ _COACH_TENDENCY_SPECS: list[_CoachTendencySpec] = [
         "offense_coach",
         lambda df: df["shotgun"] == 1,
         lambda df: df["is_go_for_it"],
+    ),
+    (
+        "off_under_center_rate_hist",
+        "offense_coach",
+        lambda df: df["offense_formation"] == "UNDER CENTER",
+        lambda df: df["is_go_for_it"] & df["offense_formation"].notna(),
+    ),
+    (
+        "off_pistol_rate_hist",
+        "offense_coach",
+        lambda df: df["offense_formation"] == "PISTOL",
+        lambda df: df["is_go_for_it"] & df["offense_formation"].notna(),
     ),
     (
         "off_no_huddle_rate_hist",
