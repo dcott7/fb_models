@@ -11,6 +11,7 @@ __all__ = [
     "load_players_dataset",
     "load_weekly_rosters_dataset",
     "load_games_dataset",
+    "load_depth_charts_dataset",
 ]
 
 DATA_DIR = RAW_DATA_DIR / "nflverse"
@@ -119,6 +120,17 @@ _GAMES_RETAIN_COL: list[str] = [
 ]
 
 
+_DEPTH_CHARTS_RETAIN_COLS: list[str] = [
+    "season",
+    "club_code",
+    "week",
+    "game_type",
+    "formation",
+    "depth_position",
+    "depth_team",
+    "gsis_id",
+]
+
 _RED_ZONE_YARDLINE = 20
 _GOAL_LINE_YARDLINE = 5
 _NEUTRAL_SCORE_MARGIN = 8
@@ -179,6 +191,11 @@ class NflVerseRepo:
         url = "https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv"
         return self._get_or_download(filename, url)
 
+    def get_depth_charts(self, season: int) -> Path:
+        filename = f"depth_charts_{season}.parquet"
+        url = f"{self.BASE_URL}/depth_charts/depth_charts_{season}.parquet"
+        return self._get_or_download(filename, url)
+
 
 def _load_pbp(seasons: list[int]) -> pd.DataFrame:
     repo = NflVerseRepo()
@@ -206,6 +223,12 @@ def _load_players() -> pd.DataFrame:
 def _load_games() -> pd.DataFrame:
     repo = NflVerseRepo()
     return pd.read_csv(repo.get_games())
+
+
+def _load_depth_charts(seasons: list[int]) -> pd.DataFrame:
+    repo = NflVerseRepo()
+    dfs = [pd.read_parquet(repo.get_depth_charts(season)) for season in seasons]
+    return pd.concat(dfs, ignore_index=True)
 
 
 def _add_derived_columns_pbp(df: pd.DataFrame) -> pd.DataFrame:
@@ -303,6 +326,10 @@ def load_weekly_rosters_dataset(seasons: list[int]) -> pd.DataFrame:
 
 def load_games_dataset() -> pd.DataFrame:
     return _load_games()[_GAMES_RETAIN_COL]
+
+
+def load_depth_charts_dataset(seasons: list[int]) -> pd.DataFrame:
+    return _load_depth_charts(seasons=seasons)[_DEPTH_CHARTS_RETAIN_COLS]
 
 
 if __name__ == "__main__":

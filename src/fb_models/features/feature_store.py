@@ -17,13 +17,15 @@ class FeatureStore:
         participation_df: pd.DataFrame,
         players_df: pd.DataFrame,
         weekly_rosters_df: pd.DataFrame,
-        games_df: pd.DataFrame
+        games_df: pd.DataFrame,
+        depth_chart_df: pd.DataFrame,
     ):
         self.plays_df = plays_df
         self.participation_df = participation_df
         self.players_df = players_df
         self.weekly_rosters_df = weekly_rosters_df
         self.games_df = games_df
+        self.depth_chart_df = depth_chart_df
 
         self.players: dict = {}
         self.participation: dict = {}
@@ -38,8 +40,8 @@ class FeatureStore:
         self.players = build_players(self.players_df, self.weekly_rosters_df)
         self.participation = build_participation(self.participation_df)
         self.usage = build_usage(self.plays_df, self.participation_df)
+        self.teams = build_teams(self.depth_chart_df)
 
         self.situations = build_situation(self.plays_df)
-        # self.teams = build_teams()
         self.coaches = build_coaches(self.plays_df, self.participation_df)
         self.games = build_games(self.games_df)
