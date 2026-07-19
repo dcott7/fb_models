@@ -8,6 +8,7 @@ from .player_usage import (
     build_player_package_shares,
     build_roster_status,
 )
+from .touch_shares import build_touch_shares, player_rank_priors
 from .situations import build_situation
 from .teams import build_offense_depth_chart, build_teams
 from .coaches import build_coaches
@@ -42,6 +43,8 @@ class FeatureStore:
         self.player_package_shares: dict = {}
         self.other_package_headcounts: dict = {}
         self.roster_status: dict = {}
+        self.touch_shares: dict = {}
+        self.player_rank_priors: dict = {}
         self.coaches: dict = {}
         self.games: dict = {}
 
@@ -58,6 +61,10 @@ class FeatureStore:
             self.plays_df, self.participation_df
         )
         self.roster_status = build_roster_status(self.weekly_rosters_df)
+        self.touch_shares = build_touch_shares(self.plays_df, self.participation_df)
+        self.player_rank_priors = player_rank_priors(
+            self.depth_chart_df, self.touch_shares
+        )
 
         self.situations = build_situation(self.plays_df)
         self.coaches = build_coaches(self.plays_df, self.participation_df)
