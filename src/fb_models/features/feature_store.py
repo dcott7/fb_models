@@ -3,8 +3,13 @@ import pandas as pd
 from .players import build_players
 from .participation import build_participation
 from .usage import build_usage
+from .player_usage import (
+    build_other_package_headcounts,
+    build_player_package_shares,
+    build_roster_status,
+)
 from .situations import build_situation
-from .teams import build_teams
+from .teams import build_offense_depth_chart, build_teams
 from .coaches import build_coaches
 from .games import build_games
 
@@ -33,6 +38,10 @@ class FeatureStore:
 
         self.situations: dict = {}
         self.teams: dict = {}
+        self.offense_depth_chart: dict = {}
+        self.player_package_shares: dict = {}
+        self.other_package_headcounts: dict = {}
+        self.roster_status: dict = {}
         self.coaches: dict = {}
         self.games: dict = {}
 
@@ -41,6 +50,14 @@ class FeatureStore:
         self.participation = build_participation(self.participation_df)
         self.usage = build_usage(self.plays_df, self.participation_df)
         self.teams = build_teams(self.depth_chart_df)
+        self.offense_depth_chart = build_offense_depth_chart(self.depth_chart_df)
+        self.player_package_shares = build_player_package_shares(
+            self.plays_df, self.participation_df, self.depth_chart_df
+        )
+        self.other_package_headcounts = build_other_package_headcounts(
+            self.plays_df, self.participation_df
+        )
+        self.roster_status = build_roster_status(self.weekly_rosters_df)
 
         self.situations = build_situation(self.plays_df)
         self.coaches = build_coaches(self.plays_df, self.participation_df)
