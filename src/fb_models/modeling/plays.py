@@ -2,6 +2,7 @@ from typing import Callable
 
 import pandas as pd
 
+from ..formations import normalize_offense_formation
 from ..personnel_packages import derive_personnel_package
 
 _VALID_PLAY_TYPES = {"run", "pass", "punt", "field_goal"}
@@ -26,24 +27,6 @@ _PARTICIPATION_COLS = [
     "offense_formation",
     "offense_personnel",
 ]
-
-# nflverse changed its offense_formation tracking methodology starting in
-# 2023: 2019-2022 break "under center" into SINGLEBACK/I_FORM/JUMBO/WILDCAT
-# and separately track EMPTY (empty backfield -- confirmed 98.5% shotgun
-# snaps on real data, so it's a shotgun-family look, not under center),
-# while 2023+ collapses all the true under-center variants into a single
-# UNDER CENTER category and no longer breaks out EMPTY at all. Remapping
-# the old labels keeps the label space consistent with the current (and
-# presumably future) tracking convention across all seasons, rather than
-# training on two incompatible taxonomies that happen to share a column
-# name.
-_FORMATION_REMAP = {
-    "SINGLEBACK": "UNDER CENTER",
-    "I_FORM": "UNDER CENTER",
-    "JUMBO": "UNDER CENTER",
-    "WILDCAT": "UNDER CENTER",
-    "EMPTY": "SHOTGUN",
-}
 
 _GAMES_COLS = [
     "game_id",
@@ -99,7 +82,7 @@ def _merge_participation(
     df: pd.DataFrame, participation_df: pd.DataFrame
 ) -> pd.DataFrame:
     part = participation_df[_PARTICIPATION_COLS].copy()
-    part["offense_formation"] = part["offense_formation"].replace(_FORMATION_REMAP)
+    part = normalize_offense_formation(part)
     part = derive_personnel_package(part)
 
     return df.merge(
