@@ -1,5 +1,3 @@
-import numpy as np
-
 from ...features.player_usage import is_player_available
 from ...personnel_packages import package_headcounts
 
@@ -35,8 +33,8 @@ def _resolve_by_rank(
     """
     team_depth = offense_depth_chart.get(team, {})
     season_depth = team_depth.get(season, {})
-
     week_ranks = season_depth.get(week)
+
     if week_ranks is None:
         candidate_weeks = sorted(w for w in season_depth if w <= week)
         if candidate_weeks:
@@ -57,36 +55,39 @@ def _resolve_by_rank(
     return None
 
 
-def _sample_other_headcount(
-    other_package_headcounts: dict, *, team: str, rng: np.random.Generator
-) -> tuple[int, int, int]:
+def _other_headcount_distribution(
+    other_package_headcounts: dict, *, team: str
+) -> dict[tuple[int, int, int], float]:
+    """P(rb, te, wr) for an "OTHER" personnel package (no fixed headcount).
+    Falls back to the league-wide distribution, then a hardcoded default
+    (as a degenerate one-outcome distribution) for a team with no OTHER-
+    package history at all.
+    """
     dist = other_package_headcounts.get(team) or other_package_headcounts.get(
         "_league", {}
     )
     if not dist:
-        return _DEFAULT_HEADCOUNT
+        return {_DEFAULT_HEADCOUNT: 1.0}
 
-    headcounts = list(dist.keys())
-    probs = np.array(list(dist.values()), dtype=float)
-    idx = rng.choice(len(headcounts), p=probs / probs.sum())
-    return headcounts[idx]
+    return dist
 
 
-def _sample_group(
-    *,
+def _group_candidate_weights(
     player_package_shares: dict,
     roster_status: dict,
+    *,
     team: str,
     season: int,
     week: int,
     package: str,
     group: str,
-    count: int,
-    rng: np.random.Generator,
-) -> list[str]:
-    if count <= 0:
-        return []
-
+) -> dict[str, float]:
+    """P(candidate fills this slot) for every depth-chart-listed player at
+    `group`, restricted to players available this week and renormalized.
+    Falls back to the full (untracked-availability) pool if no eligible
+    player has any tracked history for this package, rather than returning
+    an empty distribution.
+    """
     shares = player_package_shares.get(team, {}).get(package, {}).get(group, {})
     available = {
         gsis_id: weight
@@ -94,24 +95,16 @@ def _sample_group(
         if is_player_available(roster_status, gsis_id, season, week)
     }
     if not available:
-        # No eligible player with tracked history for this package -- fall
-        # back to the full (untracked-availability) pool rather than
-        # leaving the slot empty.
         available = shares
 
-    if not available:
-        return []
+    total = sum(available.values())
+    if total <= 0:
+        return {}
 
-    candidates = list(available.keys())
-    weights = np.array(list(available.values()), dtype=float)
-    weights = weights / weights.sum()
-
-    n = min(count, len(candidates))
-    chosen = rng.choice(candidates, size=n, replace=False, p=weights)
-    return list(chosen)
+    return {gsis_id: weight / total for gsis_id, weight in available.items()}
 
 
-def select_on_field_players(
+def compute_on_field_candidates(
     *,
     team: str,
     season: int,
@@ -121,28 +114,40 @@ def select_on_field_players(
     offense_depth_chart: dict,
     roster_status: dict,
     other_package_headcounts: dict,
-    rng: np.random.Generator,
-) -> dict[str, list[str]]:
-    """Sample the 11 offensive players on the field for one simulated play.
+) -> dict:
+    """The inputs needed to determine the 11 offensive players on the field
+    for one simulated play. Pure and RNG-free -- the simulation is
+    responsible for every random draw, so a single RNG stream can drive a
+    whole simulated game and a backtest can score these distributions
+    directly.
 
     QB and the 5 O-line slots are resolved deterministically by depth-chart
     rank (see _resolve_by_rank) since their count never varies by personnel
-    package. RB/TE/WR counts come from the already-decided personnel
-    package (play_type -> formation -> personnel -> this step); their
-    *identities* are sampled without replacement, weighted by each
-    depth-chart-listed player's smoothed historical share of that team's
-    snaps in that package (see features.player_usage.build_player_package_shares).
+    package -- these come back as final gsis_ids, not distributions.
 
-    For "OTHER" packages (no fixed headcount), draws a real historical
-    (rb, te, wr) headcount tuple from the team's own OTHER-labeled plays
-    (falling back to the league-wide distribution, then a hardcoded default
-    for teams with no history at all) before sampling players for it.
+    RB/TE/WR counts come from the already-decided personnel package
+    (play_type -> formation -> personnel -> this step) via
+    personnel_packages.package_headcounts, which the simulation can call
+    directly (also pure/deterministic) -- EXCEPT for the "OTHER" package,
+    which has no fixed headcount; for that case this returns
+    other_headcount_distribution for the simulation to draw a real
+    historical (rb, te, wr) tuple from first.
 
-    Returns {"QB": [...1...], "OL": [...5...], "RB": [...], "TE": [...],
-    "WR": [...]}.
+    Whatever headcount is used, the *identities* to fill those RB/TE/WR
+    slots should be drawn without replacement from candidates[group],
+    weighted by each depth-chart-listed player's smoothed historical share
+    of that team's snaps in that package (see
+    features.player_usage.build_player_package_shares).
+
+    Returns:
+        {
+            "QB": gsis_id | None,
+            "OL": [...up to 5 gsis_ids...],
+            "other_headcount_distribution": {(rb, te, wr): probability, ...}
+                if package_headcounts(package) is None, else None,
+            "candidates": {"RB": {gsis_id: probability, ...}, "TE": {...}, "WR": {...}},
+        }
     """
-    on_field: dict[str, list[str]] = {}
-
     qb = _resolve_by_rank(
         offense_depth_chart=offense_depth_chart,
         roster_status=roster_status,
@@ -151,9 +156,8 @@ def select_on_field_players(
         week=week,
         group="QB",
     )
-    on_field["QB"] = [qb] if qb is not None else []
 
-    on_field["OL"] = [
+    ol = [
         gsis_id
         for group in _OL_GROUPS
         if (
@@ -169,24 +173,28 @@ def select_on_field_players(
         is not None
     ]
 
-    headcounts = package_headcounts(package)
-    if headcounts is None:
-        headcounts = _sample_other_headcount(
-            other_package_headcounts, team=team, rng=rng
+    other_headcount_distribution = None
+    if package_headcounts(package) is None:
+        other_headcount_distribution = _other_headcount_distribution(
+            other_package_headcounts, team=team
         )
-    rb, te, wr = headcounts
 
-    for group, count in [("RB", rb), ("TE", te), ("WR", wr)]:
-        on_field[group] = _sample_group(
-            player_package_shares=player_package_shares,
-            roster_status=roster_status,
+    candidates = {
+        group: _group_candidate_weights(
+            player_package_shares,
+            roster_status,
             team=team,
             season=season,
             week=week,
             package=package,
             group=group,
-            count=count,
-            rng=rng,
         )
+        for group in ("RB", "TE", "WR")
+    }
 
-    return on_field
+    return {
+        "QB": qb,
+        "OL": ol,
+        "other_headcount_distribution": other_headcount_distribution,
+        "candidates": candidates,
+    }

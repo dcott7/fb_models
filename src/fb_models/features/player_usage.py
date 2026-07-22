@@ -202,9 +202,9 @@ def build_player_package_shares(
 
 def build_roster_status(weekly_rosters_df: pd.DataFrame) -> dict:
     """(gsis_id, season, week) -> status string, for availability filtering
-    in select_on_field_players. A missing key means no roster record exists
-    yet for that week -- treat as available (can't know future inactive
-    lists in advance), mirroring build_coach_snapshot's handling of
+    in compute_on_field_candidates. A missing key means no roster record
+    exists yet for that week -- treat as available (can't know future
+    inactive lists in advance), mirroring build_coach_snapshot's handling of
     simulating beyond available data.
     """
     return {
