@@ -1,5 +1,3 @@
-import numpy as np
-
 # Situational buckets are thin (confirmed on real 2023 data: grouping by
 # team/package/formation/field_position gives 978 buckets, median 5 plays,
 # 25th pct 2) -- a single flat smoothing level would overfit hard at this
@@ -284,58 +282,3 @@ def compute_target_probabilities(
         None: p_none,
         **{pid: (1 - p_none) * w / total for pid, w in weights.items()},
     }
-
-
-def _sample(probs: dict, rng: np.random.Generator):
-    keys = list(probs.keys())
-    weights = np.array([probs[k] for k in keys], dtype=float)
-    weights = weights / weights.sum()
-
-    idx = rng.choice(len(keys), p=weights)
-    return keys[idx]
-
-
-def select_rusher(
-    *,
-    team: str,
-    package: str,
-    formation: str,
-    field_position: str,
-    on_field: dict,
-    touch_shares: dict,
-    rank_priors: dict,
-    rng: np.random.Generator,
-) -> str:
-    probs = compute_rush_probabilities(
-        team=team,
-        package=package,
-        formation=formation,
-        field_position=field_position,
-        on_field=on_field,
-        touch_shares=touch_shares,
-        rank_priors=rank_priors,
-    )
-    return _sample(probs, rng)
-
-
-def select_target(
-    *,
-    team: str,
-    package: str,
-    formation: str,
-    field_position: str,
-    on_field: dict,
-    touch_shares: dict,
-    rank_priors: dict,
-    rng: np.random.Generator,
-) -> str | None:
-    probs = compute_target_probabilities(
-        team=team,
-        package=package,
-        formation=formation,
-        field_position=field_position,
-        on_field=on_field,
-        touch_shares=touch_shares,
-        rank_priors=rank_priors,
-    )
-    return _sample(probs, rng)
